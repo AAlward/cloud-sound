@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EarSpy</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>EarSpy</h1>
+    <p>Turn any headset into virtual surround + mic monitoring. No proprietary software required.</p>
+  </header>
+
+  <main>
+    <section class="controls">
+      <button id="startMic">Start Mic Monitor</button>
+      <button id="captureAudio">Capture Tab / System Audio</button>
+      <button id="stopAll" disabled>Stop All</button>
+    </section>
+
+    <section class="status">
+      <div id="status">Ready. Click a button to begin.</div>
+    </section>
+
+    <section class="sliders">
+      <label>
+        Mic Volume
+        <input type="range" id="micVolume" min="0" max="2" step="0.05" value="0.8">
+      </label>
+      <label>
+        Game / Tab Volume
+        <input type="range" id="gameVolume" min="0" max="2" step="0.05" value="1.0">
+      </label>
+    </section>
+  </main>
+
+  <footer>
+    <p>Works best in Chrome / Chromium. Use headphones. Share the GeForce Now or Discord tab for game audio.</p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
