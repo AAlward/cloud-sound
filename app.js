@@ -6,9 +6,10 @@ const micVolumeSlider = document.getElementById('micVolume');
 const gameVolumeSlider = document.getElementById('gameVolume');
 
 let audioContext;
-let micSource, micGain;
+let micSource, micWorklet, micGainParam;
 let gameSource, gameGain;
 let micStream, gameStream;
+let workletLoaded = false;
 
 function setStatus(msg) {
   statusEl.textContent = msg;
@@ -25,6 +26,15 @@ async function initAudioContext() {
   }
   if (audioContext.state === 'suspended') {
     await audioContext.resume();
+  }
+
+  if (!workletLoaded) {
+    try {
+      await audioContext.audioWorklet.addModule('mic-processor.js');
+      workletLoaded = true;
+    } catch (e) {
+      console.warn('AudioWorklet failed to load, falling back to GainNode:', e);
+    }
   }
 }
 
@@ -43,17 +53,27 @@ startMicBtn.onclick = async () => {
         echoCancellation: false,
         noiseSuppression: false,
         autoGainControl: false,
-        latency: 0  // hint for lowest input latency where supported
+        latency: 0
       }
     });
 
     micSource = audioContext.createMediaStreamSource(micStream);
-    micGain = audioContext.createGain();
-    micGain.gain.value = parseFloat(micVolumeSlider.value);
 
-    micSource.connect(micGain).connect(audioContext.destination);
+    if (workletLoaded) {
+      micWorklet = new AudioWorkletNode(audioContext, 'mic-processor');
+      micGainParam = micWorklet.parameters.get('gain');
+      micGainParam.value = parseFloat(micVolumeSlider.value);
+      micSource.connect(micWorklet).connect(audioContext.destination);
+      setStatus('Mic monitoring (AudioWorklet) — wear headphones!' + getLatencyInfo());
+    } else {
+      // Fallback
+      const micGain = audioContext.createGain();
+      micGain.gain.value = parseFloat(micVolumeSlider.value);
+      micSource.connect(micGain).connect(audioContext.destination);
+      micGainParam = micGain.gain; // so slider still works
+      setStatus('Mic monitoring (fallback) — wear headphones!' + getLatencyInfo());
+    }
 
-    setStatus('Mic monitoring active — wear headphones!' + getLatencyInfo());
     startMicBtn.disabled = true;
     enableStop();
   } catch (err) {
@@ -66,7 +86,6 @@ captureAudioBtn.onclick = async () => {
   try {
     await initAudioContext();
 
-    // Request tab or screen share with audio
     gameStream = await navigator.mediaDevices.getDisplayMedia({
       video: true,
       audio: {
@@ -78,7 +97,6 @@ captureAudioBtn.onclick = async () => {
       systemAudio: 'include'
     });
 
-    // We only need the audio track
     const audioTracks = gameStream.getAudioTracks();
     if (audioTracks.length === 0) {
       setStatus('No audio track found. Make sure to share a tab and enable audio.');
@@ -86,7 +104,6 @@ captureAudioBtn.onclick = async () => {
       return;
     }
 
-    // Stop the video track — we don't need it
     gameStream.getVideoTracks().forEach(t => t.stop());
 
     gameSource = audioContext.createMediaStreamSource(gameStream);
@@ -105,7 +122,14 @@ captureAudioBtn.onclick = async () => {
 };
 
 micVolumeSlider.oninput = () => {
-  if (micGain) micGain.gain.value = parseFloat(micVolumeSlider.value);
+  const val = parseFloat(micVolumeSlider.value);
+  if (micGainParam) {
+    if (micGainParam.value !== undefined) {
+      micGainParam.value = val; // AudioParam
+    } else if (micGainParam.setValueAtTime) {
+      micGainParam.setValueAtTime(val, audioContext.currentTime);
+    }
+  }
 };
 
 gameVolumeSlider.oninput = () => {
@@ -122,15 +146,17 @@ stopAllBtn.onclick = () => {
     gameStream = null;
   }
   if (micSource) micSource.disconnect();
+  if (micWorklet) micWorklet.disconnect();
   if (gameSource) gameSource.disconnect();
 
+  micWorklet = null;
+  micGainParam = null;
   startMicBtn.disabled = false;
   captureAudioBtn.disabled = false;
   stopAllBtn.disabled = true;
   setStatus('Stopped. Ready to start again.');
 };
 
-// Cleanup on page unload
 window.addEventListener('beforeunload', () => {
   stopAllBtn.click();
 });
