@@ -13,14 +13,37 @@
   </header>
 
   <main>
+    <section class="device-info">
+      <div id="deviceDisplay">Audio device: detecting…</div>
+    </section>
+
     <section class="controls">
       <button id="startMic">Start Mic Monitor</button>
       <button id="captureAudio">Capture Another Tab</button>
+      <button id="testSurround">Test Virtual Surround</button>
       <button id="stopAll" disabled>Stop All</button>
     </section>
 
     <section class="status">
       <div id="status">Ready. Click a button to begin.</div>
+    </section>
+
+    <section class="features">
+      <label class="toggle">
+        <input type="checkbox" id="eqEnabled">
+        EQ Enabled
+      </label>
+      <label class="toggle">
+        <input type="checkbox" id="surroundEnabled" checked>
+        Virtual Surround Enabled
+      </label>
+    </section>
+
+    <section class="eq-section" id="eqSection">
+      <h2>Equalizer</h2>
+      <div class="eq-bands" id="eqBands">
+        <!-- bands inserted by JS -->
+      </div>
     </section>
 
     <section class="sliders">
@@ -37,7 +60,7 @@
   </main>
 
   <footer>
-    <p>Works best in Chrome / Chromium. Use headphones. You can capture multiple tabs (Discord + GeForce Now) and mix them with your mic.</p>
+    <p>Works best in Chrome / Chromium. Use headphones. Virtual surround uses HRTF. Test button pans a tone around your head.</p>
   </footer>
 
   <script src="app.js"></script>
