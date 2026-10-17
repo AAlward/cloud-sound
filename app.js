@@ -20,11 +20,19 @@ function enableStop() {
 
 async function initAudioContext() {
   if (!audioContext) {
-    audioContext = new AudioContext({ latencyHint: 'interactive' });
+    // latencyHint: 0 requests the lowest possible latency
+    audioContext = new AudioContext({ latencyHint: 0 });
   }
   if (audioContext.state === 'suspended') {
     await audioContext.resume();
   }
+}
+
+function getLatencyInfo() {
+  if (!audioContext) return '';
+  const base = audioContext.baseLatency ? (audioContext.baseLatency * 1000).toFixed(1) : '?';
+  const output = audioContext.outputLatency ? (audioContext.outputLatency * 1000).toFixed(1) : '?';
+  return ` (base ${base}ms + output ${output}ms)`;
 }
 
 startMicBtn.onclick = async () => {
@@ -34,7 +42,8 @@ startMicBtn.onclick = async () => {
       audio: {
         echoCancellation: false,
         noiseSuppression: false,
-        autoGainControl: false
+        autoGainControl: false,
+        latency: 0  // hint for lowest input latency where supported
       }
     });
 
@@ -44,7 +53,7 @@ startMicBtn.onclick = async () => {
 
     micSource.connect(micGain).connect(audioContext.destination);
 
-    setStatus('Mic monitoring active — wear headphones!');
+    setStatus('Mic monitoring active — wear headphones!' + getLatencyInfo());
     startMicBtn.disabled = true;
     enableStop();
   } catch (err) {
@@ -86,7 +95,7 @@ captureAudioBtn.onclick = async () => {
 
     gameSource.connect(gameGain).connect(audioContext.destination);
 
-    setStatus('Game / tab audio captured. Adjust volumes as needed.');
+    setStatus('Game / tab audio captured. Adjust volumes as needed.' + getLatencyInfo());
     captureAudioBtn.disabled = true;
     enableStop();
   } catch (err) {
