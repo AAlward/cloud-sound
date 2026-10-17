@@ -8,6 +8,7 @@ const captureList = document.getElementById('captureList');
 const deviceDisplay = document.getElementById('deviceDisplay');
 const eqEnabledCheckbox = document.getElementById('eqEnabled');
 const surroundEnabledCheckbox = document.getElementById('surroundEnabled');
+const eqSection = document.getElementById('eqSection');
 const eqBandsContainer = document.getElementById('eqBands');
 
 let audioContext;
@@ -28,12 +29,20 @@ let captureCount = 0;
 let testOsc, testGain, testPanner;
 
 const EQ_BANDS = [
-  { freq: 60,   label: '60 Hz' },
-  { freq: 250,  label: '250 Hz' },
-  { freq: 1000, label: '1 kHz' },
-  { freq: 4000, label: '4 kHz' },
-  { freq: 12000,label: '12 kHz' }
+  { freq: 60,   label: '60' },
+  { freq: 250,  label: '250' },
+  { freq: 1000, label: '1k' },
+  { freq: 4000, label: '4k' },
+  { freq: 12000,label: '12k' }
 ];
+
+const PRESETS = {
+  flat:    [0, 0, 0, 0, 0],
+  bass:    [6, 3, 0, 0, 0],
+  treble:  [0, 0, 0, 3, 6],
+  gaming:  [2, 1, 0, 3, 2],
+  voice:   [-2, 0, 4, 5, 1]
+};
 
 function setStatus(msg) {
   statusEl.textContent = msg;
@@ -51,7 +60,6 @@ async function updateDeviceDisplay() {
       deviceDisplay.textContent = 'Audio device: no outputs found';
       return;
     }
-    // Prefer labeled device; fall back to default
     const defaultOut = outputs.find(d => d.deviceId === 'default') || outputs[0];
     const label = defaultOut.label || 'Default output device';
     deviceDisplay.textContent = `Audio device: ${label}`;
@@ -82,12 +90,10 @@ async function initAudioContext() {
 }
 
 function buildProcessingChain() {
-  // Master gain at the end
   masterGain = audioContext.createGain();
   masterGain.gain.value = 1;
   masterGain.connect(audioContext.destination);
 
-  // Virtual surround panner (HRTF)
   pannerNode = audioContext.createPanner();
   pannerNode.panningModel = 'HRTF';
   pannerNode.distanceModel = 'inverse';
@@ -97,12 +103,10 @@ function buildProcessingChain() {
   pannerNode.coneInnerAngle = 360;
   pannerNode.coneOuterAngle = 0;
   pannerNode.coneOuterGain = 0;
-  // Start centered
   pannerNode.positionX.value = 0;
   pannerNode.positionY.value = 0;
   pannerNode.positionZ.value = -1;
 
-  // EQ filters
   eqFilters = EQ_BANDS.map(band => {
     const filter = audioContext.createBiquadFilter();
     filter.type = 'peaking';
@@ -112,18 +116,14 @@ function buildProcessingChain() {
     return filter;
   });
 
-  // Chain: input → EQ → panner → master
-  // We'll connect sources to the first EQ (or panner if EQ off)
   connectChain();
 }
 
 function connectChain() {
-  // Disconnect previous if needed
   eqFilters.forEach(f => f.disconnect());
   pannerNode.disconnect();
 
   if (eqEnabledCheckbox.checked && eqFilters.length) {
-    // Chain EQ filters
     for (let i = 0; i < eqFilters.length - 1; i++) {
       eqFilters[i].connect(eqFilters[i + 1]);
     }
@@ -138,12 +138,10 @@ function connectChain() {
     if (surroundEnabledCheckbox.checked) {
       pannerNode.connect(masterGain);
     }
-    // Sources will connect directly to panner or master
   }
 }
 
 function getInputNode() {
-  // Where new sources should connect
   if (eqEnabledCheckbox.checked && eqFilters.length) {
     return eqFilters[0];
   }
@@ -163,9 +161,10 @@ function getLatencyInfo() {
 function buildEQUI() {
   eqBandsContainer.innerHTML = '';
   EQ_BANDS.forEach((band, i) => {
-    const label = document.createElement('label');
-    label.innerHTML = `${band.label}<br><input type="range" min="-12" max="12" step="0.5" value="0" data-band="${i}">`;
-    eqBandsContainer.appendChild(label);
+    const div = document.createElement('div');
+    div.className = 'eq-band';
+    div.innerHTML = `<span>${band.label}</span><input type="range" min="-12" max="12" step="0.5" value="0" data-band="${i}">`;
+    eqBandsContainer.appendChild(div);
   });
 
   eqBandsContainer.querySelectorAll('input').forEach(slider => {
@@ -175,6 +174,16 @@ function buildEQUI() {
         eqFilters[idx].gain.value = parseFloat(slider.value);
       }
     };
+  });
+}
+
+function applyPreset(name) {
+  const values = PRESETS[name];
+  if (!values) return;
+  const sliders = eqBandsContainer.querySelectorAll('input');
+  values.forEach((val, i) => {
+    if (eqFilters[i]) eqFilters[i].gain.value = val;
+    if (sliders[i]) sliders[i].value = val;
   });
 }
 
@@ -225,28 +234,34 @@ function removeCapture(index) {
   }
 }
 
-// Reconnect all current sources when EQ/surround toggles change
 function reconnectSources() {
   connectChain();
   const inputNode = getInputNode();
 
-  // Mic
   if (micWorklet) {
     micWorklet.disconnect();
     micWorklet.connect(inputNode);
-  } else if (micSource) {
-    // fallback path already connected via gain; re-wire if needed
   }
 
-  // Captures
   captures.forEach(cap => {
     cap.gain.disconnect();
     cap.gain.connect(inputNode);
   });
 }
 
-eqEnabledCheckbox.onchange = reconnectSources;
+// Show/hide EQ section
+function toggleEQSection() {
+  eqSection.style.display = eqEnabledCheckbox.checked ? 'block' : 'none';
+  reconnectSources();
+}
+
+eqEnabledCheckbox.onchange = toggleEQSection;
 surroundEnabledCheckbox.onchange = reconnectSources;
+
+// Preset buttons
+document.querySelectorAll('.preset-btn').forEach(btn => {
+  btn.onclick = () => applyPreset(btn.dataset.preset);
+});
 
 startMicBtn.onclick = async () => {
   try {
@@ -330,7 +345,6 @@ captureAudioBtn.onclick = async () => {
   }
 };
 
-// Virtual surround test: pans a tone around the listener
 testSurroundBtn.onclick = async () => {
   try {
     await initAudioContext();
@@ -360,7 +374,6 @@ testSurroundBtn.onclick = async () => {
     setStatus('Surround test running — listen for the tone moving around your head');
     enableStop();
 
-    // Animate position in a circle
     let angle = 0;
     const interval = setInterval(() => {
       if (!testOsc) {
@@ -374,7 +387,6 @@ testSurroundBtn.onclick = async () => {
       testPanner.positionZ.value = z;
     }, 50);
 
-    // Auto-stop after 8 seconds
     setTimeout(() => {
       if (testOsc) {
         testOsc.stop();
@@ -429,10 +441,11 @@ stopAllBtn.onclick = () => {
   setStatus('Stopped. Ready to start again.');
 };
 
-// Init EQ UI and device display on load
+// Init
 buildEQUI();
 updateDeviceDisplay();
 navigator.mediaDevices.addEventListener('devicechange', updateDeviceDisplay);
+toggleEQSection(); // initial hide
 
 window.addEventListener('beforeunload', () => {
   stopAllBtn.click();
