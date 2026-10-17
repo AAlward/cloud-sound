@@ -15,7 +15,7 @@
   <main>
     <section class="controls">
       <button id="startMic">Start Mic Monitor</button>
-      <button id="captureAudio">Capture Tab / System Audio</button>
+      <button id="captureAudio">Capture Another Tab</button>
       <button id="stopAll" disabled>Stop All</button>
     </section>
 
@@ -28,15 +28,16 @@
         Mic Volume
         <input type="range" id="micVolume" min="0" max="2" step="0.05" value="0.8">
       </label>
-      <label>
-        Game / Tab Volume
-        <input type="range" id="gameVolume" min="0" max="2" step="0.05" value="1.0">
-      </label>
+    </section>
+
+    <section id="captures">
+      <h2>Captured Tabs</h2>
+      <div id="captureList">No tabs captured yet. Click "Capture Another Tab" and share Discord, GeForce Now, etc.</div>
     </section>
   </main>
 
   <footer>
-    <p>Works best in Chrome / Chromium. Use headphones. Share the GeForce Now or Discord tab for game audio.</p>
+    <p>Works best in Chrome / Chromium. Use headphones. You can capture multiple tabs (Discord + GeForce Now) and mix them with your mic.</p>
   </footer>
 
   <script src="app.js"></script>
