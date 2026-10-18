@@ -11,9 +11,9 @@ class MicProcessor extends AudioWorkletProcessor {
       },
       {
         name: 'gateThreshold',
-        defaultValue: 0.08,
+        defaultValue: 0.015,
         minValue: 0,
-        maxValue: 0.5,
+        maxValue: 0.2,
         automationRate: 'k-rate'
       },
       {
@@ -29,9 +29,10 @@ class MicProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
     this.envelope = 0;
-    this.attack = 0.005;
-    this.release = 0.08;
+    this.attack = 0.02;
+    this.release = 0.12;
     this.frameCount = 0;
+    this.peak = 0;
   }
 
   process(inputs, outputs, parameters) {
@@ -43,6 +44,8 @@ class MicProcessor extends AudioWorkletProcessor {
 
     if (input.length === 0) return true;
 
+    let blockPeak = 0;
+
     for (let channel = 0; channel < input.length; channel++) {
       const inputChannel = input[channel];
       const outputChannel = output[channel];
@@ -52,6 +55,7 @@ class MicProcessor extends AudioWorkletProcessor {
       for (let i = 0; i < inputChannel.length; i++) {
         let sample = inputChannel[i];
         const abs = Math.abs(sample);
+        if (abs > blockPeak) blockPeak = abs;
 
         if (abs > this.envelope) {
           this.envelope += (abs - this.envelope) * this.attack;
@@ -64,7 +68,7 @@ class MicProcessor extends AudioWorkletProcessor {
           if (this.envelope < threshold) {
             gateGain = 0;
           } else {
-            const range = Math.max(threshold * 1.5, 0.01);
+            const range = Math.max(threshold * 0.8, 0.005);
             gateGain = Math.min(1, (this.envelope - threshold) / range);
           }
         }
@@ -74,10 +78,11 @@ class MicProcessor extends AudioWorkletProcessor {
       }
     }
 
-    // Send level to main thread occasionally for the VU meter
+    this.peak = Math.max(this.peak * 0.95, blockPeak);
+
     this.frameCount++;
-    if (this.frameCount % 4 === 0) {
-      this.port.postMessage({ level: this.envelope });
+    if (this.frameCount % 3 === 0) {
+      this.port.postMessage({ level: this.envelope, peak: this.peak });
     }
 
     return true;
