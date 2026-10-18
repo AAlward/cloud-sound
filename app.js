@@ -5,6 +5,7 @@ const stopAllBtn = document.getElementById('stopAll');
 const statusEl = document.getElementById('status');
 const micVolumeSlider = document.getElementById('micVolume');
 const gateThresholdSlider = document.getElementById('gateThreshold');
+const vuFill = document.getElementById('vuFill');
 const captureList = document.getElementById('captureList');
 const deviceDisplay = document.getElementById('deviceDisplay');
 const eqEnabledCheckbox = document.getElementById('eqEnabled');
@@ -272,6 +273,13 @@ function updateGateParams() {
   }
 }
 
+function updateVU(level) {
+  if (!vuFill) return;
+  // Map 0–0.5 envelope to 0–100% for the meter
+  const pct = Math.min(100, (level / 0.4) * 100);
+  vuFill.style.width = pct + '%';
+}
+
 async function startMic() {
   try {
     await initAudioContext();
@@ -303,9 +311,15 @@ async function startMic() {
       micGainParam.value = parseFloat(micVolumeSlider.value);
       updateGateParams();
 
+      micWorklet.port.onmessage = (e) => {
+        if (e.data && typeof e.data.level === 'number') {
+          updateVU(e.data.level);
+        }
+      };
+
       micSource.connect(micWorklet);
       micWorklet.connect(inputNode);
-      setStatus('Mic monitoring (noise gate available) — wear headphones!' + getLatencyInfo());
+      setStatus('Mic monitoring (noise gate + meter) — wear headphones!' + getLatencyInfo());
     } else {
       const micGain = audioContext.createGain();
       micGain.gain.value = parseFloat(micVolumeSlider.value);
@@ -464,6 +478,7 @@ stopAllBtn.onclick = () => {
   micGainParam = null;
   gateThresholdParam = null;
   gateEnabledParam = null;
+  if (vuFill) vuFill.style.width = '0%';
   startMicBtn.disabled = false;
   stopAllBtn.disabled = true;
   setStatus('Stopped. Ready to start again.');
