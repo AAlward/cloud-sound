@@ -11,7 +11,7 @@ class MicProcessor extends AudioWorkletProcessor {
       },
       {
         name: 'gateThreshold',
-        defaultValue: 0.02,
+        defaultValue: 0.08,
         minValue: 0,
         maxValue: 0.5,
         automationRate: 'k-rate'
@@ -29,8 +29,9 @@ class MicProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
     this.envelope = 0;
-    this.attack = 0.01;
-    this.release = 0.15;
+    this.attack = 0.005;
+    this.release = 0.08;
+    this.frameCount = 0;
   }
 
   process(inputs, outputs, parameters) {
@@ -52,7 +53,6 @@ class MicProcessor extends AudioWorkletProcessor {
         let sample = inputChannel[i];
         const abs = Math.abs(sample);
 
-        // Simple envelope follower
         if (abs > this.envelope) {
           this.envelope += (abs - this.envelope) * this.attack;
         } else {
@@ -61,12 +61,10 @@ class MicProcessor extends AudioWorkletProcessor {
 
         let gateGain = 1;
         if (gateOn) {
-          // Soft gate: fade in when above threshold
           if (this.envelope < threshold) {
             gateGain = 0;
           } else {
-            // Soft knee
-            const range = threshold * 2;
+            const range = Math.max(threshold * 1.5, 0.01);
             gateGain = Math.min(1, (this.envelope - threshold) / range);
           }
         }
@@ -74,6 +72,12 @@ class MicProcessor extends AudioWorkletProcessor {
         const g = (gainValues ? gainValues[i] : gainValue) * gateGain;
         outputChannel[i] = sample * g;
       }
+    }
+
+    // Send level to main thread occasionally for the VU meter
+    this.frameCount++;
+    if (this.frameCount % 4 === 0) {
+      this.port.postMessage({ level: this.envelope });
     }
 
     return true;
