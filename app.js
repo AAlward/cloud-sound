@@ -264,10 +264,10 @@ document.querySelectorAll('.preset-btn').forEach(btn => {
   btn.onclick = () => applyPreset(btn.dataset.preset);
 });
 
-// Map 0-100 slider to a small amplitude threshold
+// Much less sensitive mapping: 0-100 slider -> tiny threshold
 function sliderToThreshold(sliderValue) {
   const t = parseFloat(sliderValue) / 100;
-  return t * t * 0.08; // quadratic so low end is finer
+  return Math.pow(t, 2.5) * 0.03;
 }
 
 function updateGateParams() {
@@ -281,10 +281,9 @@ function updateGateParams() {
 
 function updateVU(level) {
   if (!vuFill) return;
-  // Amplify small levels so normal speech fills more of the meter
-  const scaled = Math.min(1, level * 25);
-  const pct = Math.pow(scaled, 0.6) * 100;
-  vuFill.style.width = pct + '%';
+  const scaled = Math.min(1, level * 40);
+  const pct = Math.pow(scaled, 0.5) * 100;
+  vuFill.style.width = Math.min(100, pct) + '%';
 }
 
 async function startMic() {
