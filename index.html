@@ -50,7 +50,10 @@
       </label>
       <label id="gateThresholdLabel">
         Gate Threshold
-        <input type="range" id="gateThreshold" min="0" max="0.2" step="0.005" value="0.03">
+        <div class="gate-meter-wrap">
+          <div class="vu-meter" id="vuMeter"><div class="vu-fill" id="vuFill"></div></div>
+          <input type="range" id="gateThreshold" min="0.01" max="0.4" step="0.005" value="0.08">
+        </div>
       </label>
     </section>
 
@@ -75,7 +78,7 @@
   </main>
 
   <footer>
-    <p>Works best in Chrome / Chromium. Use headphones. Noise Gate mutes the mic when below the threshold so quiet room noise drops out.</p>
+    <p>Works best in Chrome / Chromium. Use headphones. Noise Gate mutes the mic when below the threshold. The meter shows your current level.</p>
   </footer>
 
   <script src="app.js"></script>
