@@ -180,6 +180,28 @@ input[type="range"] {
   width: 100%;
 }
 
+.gate-meter-wrap {
+  position: relative;
+  margin-top: 0.25rem;
+}
+
+.vu-meter {
+  height: 8px;
+  background: #334155;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 6px;
+  position: relative;
+}
+
+.vu-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #22c55e, #eab308, #ef4444);
+  border-radius: 4px;
+  transition: width 0.05s linear;
+}
+
 #captures {
   max-width: 500px;
   margin: 0 auto;
