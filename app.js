@@ -8,6 +8,7 @@ const captureList = document.getElementById('captureList');
 const deviceDisplay = document.getElementById('deviceDisplay');
 const eqEnabledCheckbox = document.getElementById('eqEnabled');
 const surroundEnabledCheckbox = document.getElementById('surroundEnabled');
+const noiseSuppressionCheckbox = document.getElementById('noiseSuppression');
 const eqSection = document.getElementById('eqSection');
 const eqBandsContainer = document.getElementById('eqBands');
 
@@ -17,8 +18,8 @@ let micStream;
 let workletLoaded = false;
 
 // Processing chain
-let eqFilters = []; // BiquadFilterNodes
-let pannerNode;     // for virtual surround
+let eqFilters = [];
+let pannerNode;
 let masterGain;
 
 // Array of captured tab streams
@@ -249,7 +250,6 @@ function reconnectSources() {
   });
 }
 
-// Show/hide EQ section
 function toggleEQSection() {
   eqSection.style.display = eqEnabledCheckbox.checked ? 'block' : 'none';
   reconnectSources();
@@ -258,18 +258,27 @@ function toggleEQSection() {
 eqEnabledCheckbox.onchange = toggleEQSection;
 surroundEnabledCheckbox.onchange = reconnectSources;
 
-// Preset buttons
 document.querySelectorAll('.preset-btn').forEach(btn => {
   btn.onclick = () => applyPreset(btn.dataset.preset);
 });
 
-startMicBtn.onclick = async () => {
+async function startMic() {
   try {
     await initAudioContext();
+
+    // Stop any existing mic first
+    if (micStream) {
+      micStream.getTracks().forEach(t => t.stop());
+      if (micSource) micSource.disconnect();
+      if (micWorklet) micWorklet.disconnect();
+    }
+
+    const useNoiseSuppression = noiseSuppressionCheckbox.checked;
+
     micStream = await navigator.mediaDevices.getUserMedia({
       audio: {
-        echoCancellation: false,
-        noiseSuppression: false,
+        echoCancellation: useNoiseSuppression,
+        noiseSuppression: useNoiseSuppression,
         autoGainControl: false,
         latency: 0
       }
@@ -284,13 +293,13 @@ startMicBtn.onclick = async () => {
       micGainParam.value = parseFloat(micVolumeSlider.value);
       micSource.connect(micWorklet);
       micWorklet.connect(inputNode);
-      setStatus('Mic monitoring (AudioWorklet) — wear headphones!' + getLatencyInfo());
+      setStatus(`Mic monitoring${useNoiseSuppression ? ' (noise suppression on)' : ''} — wear headphones!` + getLatencyInfo());
     } else {
       const micGain = audioContext.createGain();
       micGain.gain.value = parseFloat(micVolumeSlider.value);
       micSource.connect(micGain).connect(inputNode);
       micGainParam = micGain.gain;
-      setStatus('Mic monitoring (fallback) — wear headphones!' + getLatencyInfo());
+      setStatus(`Mic monitoring${useNoiseSuppression ? ' (noise suppression on)' : ''} — wear headphones!` + getLatencyInfo());
     }
 
     startMicBtn.disabled = true;
@@ -298,6 +307,15 @@ startMicBtn.onclick = async () => {
   } catch (err) {
     setStatus('Mic error: ' + err.message);
     console.error(err);
+  }
+}
+
+startMicBtn.onclick = startMic;
+
+// Restart mic if noise suppression is toggled while running
+noiseSuppressionCheckbox.onchange = () => {
+  if (micStream) {
+    startMic();
   }
 };
 
@@ -445,7 +463,7 @@ stopAllBtn.onclick = () => {
 buildEQUI();
 updateDeviceDisplay();
 navigator.mediaDevices.addEventListener('devicechange', updateDeviceDisplay);
-toggleEQSection(); // initial hide
+toggleEQSection();
 
 window.addEventListener('beforeunload', () => {
   stopAllBtn.click();
