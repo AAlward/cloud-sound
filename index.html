@@ -38,8 +38,19 @@
         Virtual Surround Enabled
       </label>
       <label class="toggle">
-        <input type="checkbox" id="noiseSuppression" checked>
-        Noise Suppression (Voice Focus)
+        <input type="checkbox" id="noiseGate" checked>
+        Noise Gate
+      </label>
+    </section>
+
+    <section class="sliders">
+      <label>
+        Mic Volume
+        <input type="range" id="micVolume" min="0" max="2" step="0.05" value="0.8">
+      </label>
+      <label id="gateThresholdLabel">
+        Gate Threshold
+        <input type="range" id="gateThreshold" min="0" max="0.2" step="0.005" value="0.03">
       </label>
     </section>
 
@@ -57,13 +68,6 @@
       </div>
     </section>
 
-    <section class="sliders">
-      <label>
-        Mic Volume
-        <input type="range" id="micVolume" min="0" max="2" step="0.05" value="0.8">
-      </label>
-    </section>
-
     <section id="captures">
       <h2>Captured Tabs</h2>
       <div id="captureList">No tabs captured yet. Click "Capture Another Tab" and share Discord, GeForce Now, etc.</div>
@@ -71,7 +75,7 @@
   </main>
 
   <footer>
-    <p>Works best in Chrome / Chromium. Use headphones. Noise Suppression reduces room noise so you mainly hear your own voice.</p>
+    <p>Works best in Chrome / Chromium. Use headphones. Noise Gate mutes the mic when below the threshold so quiet room noise drops out.</p>
   </footer>
 
   <script src="app.js"></script>
