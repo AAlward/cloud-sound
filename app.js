@@ -264,19 +264,26 @@ document.querySelectorAll('.preset-btn').forEach(btn => {
   btn.onclick = () => applyPreset(btn.dataset.preset);
 });
 
+// Map 0-100 slider to a small amplitude threshold
+function sliderToThreshold(sliderValue) {
+  const t = parseFloat(sliderValue) / 100;
+  return t * t * 0.08; // quadratic so low end is finer
+}
+
 function updateGateParams() {
   if (gateEnabledParam) {
     gateEnabledParam.value = noiseGateCheckbox.checked ? 1 : 0;
   }
   if (gateThresholdParam) {
-    gateThresholdParam.value = parseFloat(gateThresholdSlider.value);
+    gateThresholdParam.value = sliderToThreshold(gateThresholdSlider.value);
   }
 }
 
 function updateVU(level) {
   if (!vuFill) return;
-  // Map 0–0.5 envelope to 0–100% for the meter
-  const pct = Math.min(100, (level / 0.4) * 100);
+  // Amplify small levels so normal speech fills more of the meter
+  const scaled = Math.min(1, level * 25);
+  const pct = Math.pow(scaled, 0.6) * 100;
   vuFill.style.width = pct + '%';
 }
 
