@@ -11,9 +11,9 @@ class MicProcessor extends AudioWorkletProcessor {
       },
       {
         name: 'gateThreshold',
-        defaultValue: 0.015,
+        defaultValue: 0.004,
         minValue: 0,
-        maxValue: 0.2,
+        maxValue: 0.05,
         automationRate: 'k-rate'
       },
       {
@@ -29,10 +29,9 @@ class MicProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
     this.envelope = 0;
-    this.attack = 0.02;
-    this.release = 0.12;
+    this.attack = 0.05;
+    this.release = 0.25;
     this.frameCount = 0;
-    this.peak = 0;
   }
 
   process(inputs, outputs, parameters) {
@@ -44,8 +43,6 @@ class MicProcessor extends AudioWorkletProcessor {
 
     if (input.length === 0) return true;
 
-    let blockPeak = 0;
-
     for (let channel = 0; channel < input.length; channel++) {
       const inputChannel = input[channel];
       const outputChannel = output[channel];
@@ -55,8 +52,8 @@ class MicProcessor extends AudioWorkletProcessor {
       for (let i = 0; i < inputChannel.length; i++) {
         let sample = inputChannel[i];
         const abs = Math.abs(sample);
-        if (abs > blockPeak) blockPeak = abs;
 
+        // Smoother envelope
         if (abs > this.envelope) {
           this.envelope += (abs - this.envelope) * this.attack;
         } else {
@@ -64,12 +61,16 @@ class MicProcessor extends AudioWorkletProcessor {
         }
 
         let gateGain = 1;
-        if (gateOn) {
+        if (gateOn && threshold > 0.0001) {
+          // Very soft knee to avoid distortion
+          const knee = threshold * 3;
           if (this.envelope < threshold) {
             gateGain = 0;
+          } else if (this.envelope < threshold + knee) {
+            const t = (this.envelope - threshold) / knee;
+            gateGain = t * t; // quadratic soft knee
           } else {
-            const range = Math.max(threshold * 0.8, 0.005);
-            gateGain = Math.min(1, (this.envelope - threshold) / range);
+            gateGain = 1;
           }
         }
 
@@ -78,11 +79,9 @@ class MicProcessor extends AudioWorkletProcessor {
       }
     }
 
-    this.peak = Math.max(this.peak * 0.95, blockPeak);
-
     this.frameCount++;
     if (this.frameCount % 3 === 0) {
-      this.port.postMessage({ level: this.envelope, peak: this.peak });
+      this.port.postMessage({ level: this.envelope });
     }
 
     return true;
