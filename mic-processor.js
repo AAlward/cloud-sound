@@ -1,19 +1,44 @@
-// AudioWorklet processor for low-latency mic monitoring
+// AudioWorklet processor for low-latency mic monitoring with optional noise gate
 class MicProcessor extends AudioWorkletProcessor {
   static get parameterDescriptors() {
-    return [{
-      name: 'gain',
-      defaultValue: 0.8,
-      minValue: 0,
-      maxValue: 2,
-      automationRate: 'a-rate'
-    }];
+    return [
+      {
+        name: 'gain',
+        defaultValue: 0.8,
+        minValue: 0,
+        maxValue: 2,
+        automationRate: 'a-rate'
+      },
+      {
+        name: 'gateThreshold',
+        defaultValue: 0.02,
+        minValue: 0,
+        maxValue: 0.5,
+        automationRate: 'k-rate'
+      },
+      {
+        name: 'gateEnabled',
+        defaultValue: 0,
+        minValue: 0,
+        maxValue: 1,
+        automationRate: 'k-rate'
+      }
+    ];
+  }
+
+  constructor() {
+    super();
+    this.envelope = 0;
+    this.attack = 0.01;
+    this.release = 0.15;
   }
 
   process(inputs, outputs, parameters) {
     const input = inputs[0];
     const output = outputs[0];
     const gain = parameters.gain;
+    const threshold = parameters.gateThreshold[0];
+    const gateOn = parameters.gateEnabled[0] > 0.5;
 
     if (input.length === 0) return true;
 
@@ -24,8 +49,30 @@ class MicProcessor extends AudioWorkletProcessor {
       const gainValue = gain.length === 1 ? gain[0] : 1;
 
       for (let i = 0; i < inputChannel.length; i++) {
-        const g = gainValues ? gainValues[i] : gainValue;
-        outputChannel[i] = inputChannel[i] * g;
+        let sample = inputChannel[i];
+        const abs = Math.abs(sample);
+
+        // Simple envelope follower
+        if (abs > this.envelope) {
+          this.envelope += (abs - this.envelope) * this.attack;
+        } else {
+          this.envelope += (abs - this.envelope) * this.release;
+        }
+
+        let gateGain = 1;
+        if (gateOn) {
+          // Soft gate: fade in when above threshold
+          if (this.envelope < threshold) {
+            gateGain = 0;
+          } else {
+            // Soft knee
+            const range = threshold * 2;
+            gateGain = Math.min(1, (this.envelope - threshold) / range);
+          }
+        }
+
+        const g = (gainValues ? gainValues[i] : gainValue) * gateGain;
+        outputChannel[i] = sample * g;
       }
     }
 
