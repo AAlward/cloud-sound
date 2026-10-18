@@ -4,16 +4,17 @@ const testSurroundBtn = document.getElementById('testSurround');
 const stopAllBtn = document.getElementById('stopAll');
 const statusEl = document.getElementById('status');
 const micVolumeSlider = document.getElementById('micVolume');
+const gateThresholdSlider = document.getElementById('gateThreshold');
 const captureList = document.getElementById('captureList');
 const deviceDisplay = document.getElementById('deviceDisplay');
 const eqEnabledCheckbox = document.getElementById('eqEnabled');
 const surroundEnabledCheckbox = document.getElementById('surroundEnabled');
-const noiseSuppressionCheckbox = document.getElementById('noiseSuppression');
+const noiseGateCheckbox = document.getElementById('noiseGate');
 const eqSection = document.getElementById('eqSection');
 const eqBandsContainer = document.getElementById('eqBands');
 
 let audioContext;
-let micSource, micWorklet, micGainParam;
+let micSource, micWorklet, micGainParam, gateThresholdParam, gateEnabledParam;
 let micStream;
 let workletLoaded = false;
 
@@ -262,23 +263,29 @@ document.querySelectorAll('.preset-btn').forEach(btn => {
   btn.onclick = () => applyPreset(btn.dataset.preset);
 });
 
+function updateGateParams() {
+  if (gateEnabledParam) {
+    gateEnabledParam.value = noiseGateCheckbox.checked ? 1 : 0;
+  }
+  if (gateThresholdParam) {
+    gateThresholdParam.value = parseFloat(gateThresholdSlider.value);
+  }
+}
+
 async function startMic() {
   try {
     await initAudioContext();
 
-    // Stop any existing mic first
     if (micStream) {
       micStream.getTracks().forEach(t => t.stop());
       if (micSource) micSource.disconnect();
       if (micWorklet) micWorklet.disconnect();
     }
 
-    const useNoiseSuppression = noiseSuppressionCheckbox.checked;
-
     micStream = await navigator.mediaDevices.getUserMedia({
       audio: {
-        echoCancellation: useNoiseSuppression,
-        noiseSuppression: useNoiseSuppression,
+        echoCancellation: false,
+        noiseSuppression: false,
         autoGainControl: false,
         latency: 0
       }
@@ -290,16 +297,21 @@ async function startMic() {
     if (workletLoaded) {
       micWorklet = new AudioWorkletNode(audioContext, 'mic-processor');
       micGainParam = micWorklet.parameters.get('gain');
+      gateThresholdParam = micWorklet.parameters.get('gateThreshold');
+      gateEnabledParam = micWorklet.parameters.get('gateEnabled');
+
       micGainParam.value = parseFloat(micVolumeSlider.value);
+      updateGateParams();
+
       micSource.connect(micWorklet);
       micWorklet.connect(inputNode);
-      setStatus(`Mic monitoring${useNoiseSuppression ? ' (noise suppression on)' : ''} — wear headphones!` + getLatencyInfo());
+      setStatus('Mic monitoring (noise gate available) — wear headphones!' + getLatencyInfo());
     } else {
       const micGain = audioContext.createGain();
       micGain.gain.value = parseFloat(micVolumeSlider.value);
       micSource.connect(micGain).connect(inputNode);
       micGainParam = micGain.gain;
-      setStatus(`Mic monitoring${useNoiseSuppression ? ' (noise suppression on)' : ''} — wear headphones!` + getLatencyInfo());
+      setStatus('Mic monitoring (fallback) — wear headphones!' + getLatencyInfo());
     }
 
     startMicBtn.disabled = true;
@@ -312,12 +324,8 @@ async function startMic() {
 
 startMicBtn.onclick = startMic;
 
-// Restart mic if noise suppression is toggled while running
-noiseSuppressionCheckbox.onchange = () => {
-  if (micStream) {
-    startMic();
-  }
-};
+noiseGateCheckbox.onchange = updateGateParams;
+gateThresholdSlider.oninput = updateGateParams;
 
 captureAudioBtn.onclick = async () => {
   try {
@@ -454,6 +462,8 @@ stopAllBtn.onclick = () => {
 
   micWorklet = null;
   micGainParam = null;
+  gateThresholdParam = null;
+  gateEnabledParam = null;
   startMicBtn.disabled = false;
   stopAllBtn.disabled = true;
   setStatus('Stopped. Ready to start again.');
